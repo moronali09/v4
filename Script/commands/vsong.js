@@ -1,22 +1,18 @@
-const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
 const ytSearch = require("yt-search");
+const play = require("play-dl");
 
 module.exports = {
   config: {
     name: "vsong",
-    version: "1.0.0",
+    version: "2.0.0",
     hasPermssion: 0,
-    credits: "Modified by moron ali",
-    description: "Download YouTube video from keyword search",
+    credits: "moron ali (no api)",
+    description: "Download YouTube video using keyword (no API)",
     commandCategory: "Media",
     usages: "[video name]",
     cooldowns: 5,
-    dependencies: {
-      "node-fetch": "",
-      "yt-search": "",
-    },
   },
 
   run: async function ({ api, event, args }) {
@@ -24,59 +20,51 @@ module.exports = {
     if (!keyword)
       return api.sendMessage("Please enter a song or video name.", event.threadID, event.messageID);
 
-    const processingMessage = await api.sendMessage("Searching for the video...", event.threadID, null, event.messageID);
+    const processingMessage = await api.sendMessage("🔍 Searching video...", event.threadID, null, event.messageID);
 
     try {
-      const searchResults = await ytSearch(keyword);
-      if (!searchResults || !searchResults.videos.length) {
-        throw new Error("No video found.");
-      }
+      const results = await ytSearch(keyword);
+      if (!results.videos || results.videos.length === 0)
+        return api.sendMessage("❌ No video found.", event.threadID, event.messageID);
 
-      const topResult = searchResults.videos[0];
-      const videoId = topResult.videoId;
-      const apiKey = "priyansh-here";
-      const apiUrl = `https://priyansh-ai.onrender.com/youtube?id=${videoId}&type=video&apikey=${apiKey}`;
-
-      const downloadResponse = await axios.get(apiUrl);
-      const downloadUrl = downloadResponse.data.downloadUrl;
-
-      const safeTitle = topResult.title.replace(/[^a-zA-Z0-9 \-_]/g, "");
+      const video = results.videos[0];
+      const videoURL = video.url;
+      const safeTitle = video.title.replace(/[^a-zA-Z0-9 \-_]/g, "").substring(0, 50);
       const filename = `${safeTitle}.mp4`;
-      const downloadPath = path.join(__dirname, "cache", filename);
+      const filePath = path.join(__dirname, "cache", filename);
 
-      if (!fs.existsSync(path.dirname(downloadPath))) {
-        fs.mkdirSync(path.dirname(downloadPath), { recursive: true });
+      if (!fs.existsSync(path.dirname(filePath))) {
+        fs.mkdirSync(path.dirname(filePath), { recursive: true });
       }
 
-      const response = await axios({
-        url: downloadUrl,
-        method: "GET",
-        responseType: "stream",
+      const stream = await play.stream(videoURL, { quality: 18 });
+      const file = fs.createWriteStream(filePath);
+
+      stream.stream.pipe(file);
+
+      file.on("finish", () => {
+        api.sendMessage(
+          {
+            body: `🎬 Title: ${video.title.substring(0, 30)}...`,
+            attachment: fs.createReadStream(filePath),
+          },
+
+          event.threadID,
+          () => {
+            fs.unlinkSync(filePath);
+            api.unsendMessage(processingMessage.messageID);
+          },
+          event.messageID
+        );
       });
 
-      const fileStream = fs.createWriteStream(downloadPath);
-      response.data.pipe(fileStream);
-
-      await new Promise((resolve, reject) => {
-        fileStream.on("finish", resolve);
-        fileStream.on("error", reject);
+      file.on("error", (err) => {
+        console.error(err);
+        api.sendMessage("❌ Error saving file.", event.threadID, event.messageID);
       });
-
-      await api.sendMessage(
-        {
-          attachment: fs.createReadStream(downloadPath),
-          body: `🎬 Title: ${topResult.title.substring(0, 30)}...`,
-        },
-        event.threadID,
-        () => {
-          fs.unlinkSync(downloadPath);
-          api.unsendMessage(processingMessage.messageID);
-        },
-        event.messageID
-      );
-    } catch (error) {
-      console.error(error);
-      api.sendMessage("Failed to download video.", event.threadID, event.messageID);
+    } catch (e) {
+      console.error(e);
+      api.sendMessage("❌ Something went wrong.", event.threadID, event.messageID);
     }
   },
 };
