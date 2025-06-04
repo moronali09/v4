@@ -7,18 +7,13 @@ const ffmpeg = require("fluent-ffmpeg");
 module.exports = {
  config: {
    name: "song",
-   version: "1.0.0",
+   version: "1.0.1",
    hasPermssion: 0,
    credits: "moron ali",
-   description: "Download YouTube audio/video directly without API",
-   commandCategory: "Media",
+   description: "Download YouTube audio/video",
+   commandCategory: "media",
    usages: "[song name] [audio/video]",
-   cooldowns: 5,
-   dependencies: {
-     "yt-search": "",
-     "ytdl-core": "",
-     "fluent-ffmpeg": ""
-   }
+   cooldowns: 5
  },
 
  run: async function ({ api, event, args }) {
@@ -35,70 +30,68 @@ module.exports = {
      type = "audio";
    }
 
-   const processingMessage = await api.sendMessage(
-     "✅ Downloading from YouTube, please wait...",
+   const msg = await api.sendMessage(
+     "⏳ Downloading, please wait...",
      event.threadID,
      null,
      event.messageID
    );
 
    try {
-     const searchResults = await ytSearch(songName);
-     if (!searchResults || !searchResults.videos.length) {
-       throw new Error("No results found.");
-     }
+     const res = await ytSearch(songName);
+     const video = res.videos.sort((a, b) => b.views - a.views)[0];
 
-     const topResult = searchResults.videos.sort((a, b) => b.views - a.views)[0];
-     const videoUrl = topResult.url;
-     const safeTitle = topResult.title.replace(/[^a-zA-Z0-9 \-_]/g, "").substring(0, 50);
-     const ext = type === "audio" ? "mp3" : "mp4";
-     const fileName = `${safeTitle}.${ext}`;
+     if (!video) throw new Error("No video found.");
+
+     const titleShort =
+       video.title.length > 40
+         ? video.title.substring(0, 40) + "..."
+         : video.title;
+
+     const fileName = `${titleShort.replace(/[^a-zA-Z0-9]/g, "_")}.${type === "audio" ? "mp3" : "mp4"}`;
      const filePath = path.join(__dirname, "cache", fileName);
 
-     if (!fs.existsSync(path.dirname(filePath))) {
-       fs.mkdirSync(path.dirname(filePath), { recursive: true });
-     }
+     if (!fs.existsSync("cache")) fs.mkdirSync("cache");
 
      if (type === "video") {
-       const videoStream = ytdl(videoUrl, { quality: "highestvideo" });
-       const fileStream = fs.createWriteStream(filePath);
-       videoStream.pipe(fileStream);
+       const stream = ytdl(video.url, { quality: "highestvideo" });
+       const writeStream = fs.createWriteStream(filePath);
+       stream.pipe(writeStream);
 
-       await new Promise((resolve, reject) => {
-         fileStream.on("finish", resolve);
-         fileStream.on("error", reject);
+       await new Promise((res, rej) => {
+         writeStream.on("finish", res);
+         writeStream.on("error", rej);
        });
-
      } else {
-       await new Promise((resolve, reject) => {
-         const stream = ytdl(videoUrl, { filter: "audioonly" });
+       const stream = ytdl(video.url, { filter: "audioonly" });
+       await new Promise((res, rej) => {
          ffmpeg(stream)
            .audioBitrate(128)
            .save(filePath)
-           .on("end", resolve)
-           .on("error", reject);
+           .on("end", res)
+           .on("error", rej);
        });
      }
 
      await api.sendMessage(
        {
-         attachment: fs.createReadStream(filePath),
-         body: `🎵 Title: ${topResult.title}\n🕒 Duration: ${topResult.timestamp}`,
+         body: `🎵 Title: ${titleShort}\n⏱ Duration: ${video.timestamp}`,
+         attachment: fs.createReadStream(filePath)
        },
        event.threadID,
        () => {
          fs.unlinkSync(filePath);
-         api.unsendMessage(processingMessage.messageID);
+         api.unsendMessage(msg.messageID);
        },
        event.messageID
      );
 
-   } catch (err) {
-     console.error(err);
+   } catch (e) {
+     console.log(e);
      api.sendMessage(
-       `❌ Error: ${err.message}`,
+       `❌ Failed: ${e.message}`,
        event.threadID,
-       () => api.unsendMessage(processingMessage.messageID),
+       () => api.unsendMessage(msg.messageID),
        event.messageID
      );
    }
