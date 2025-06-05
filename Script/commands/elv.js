@@ -13,7 +13,7 @@ module.exports.config = {
 };
 
 module.exports.run = async ({ api, event, args }) => {
-  const apiKey = "sk_b178aae4b3045f981ac8369a6f304c282ff750d8c0e1360f";
+  const apiKey = "sk_b68f4c5e5654c9772537ac09cd2e1330c15198e82baa286f";
   const text = args.join(" ") || event.messageReply?.body;
 
   if (!text) return api.sendMessage("/elv <text> or reply", event.threadID, event.messageID);
