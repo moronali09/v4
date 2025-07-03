@@ -1,13 +1,7 @@
 ---------
 
 ###  —͟͟͞͞𝐂𝐘𝐁𝐄𝐑 ☢️_𖣘 -𝐁𝐎𝐓 ⚠️ 𝑻𝑬𝑨𝑴_ ☢️
-❖ **`A Massanger  Multi Device Bot To Take Your Massanger To Another Level !`** ❖
 
-----------
-## CLICK <a href="https://github.com/cyber-ullash/CYBER-BOT-COMMUNITY/issues">HERE IF YOU ARE NEW TO BOTS</a>
-
-
-<img src='https://i.imgur.com/ePDUcck.jpeg'/>
 
 -------
 
